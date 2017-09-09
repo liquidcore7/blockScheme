@@ -51,33 +51,7 @@ namespace misc
             delete op.second;
     }
 
-    template <typename K, typename V>
-    std::vector<K> asKeys(const std::map<K, V>& mp)
-    {
-        std::vector<K> keys(mp.size());
-        for (const auto &pair : mp)
-            keys.push_back(pair.first);
-        return keys;
-    }
-
 };
-
-
-// add equality check for vectors
-namespace std
-{
-    template <typename T>
-    bool operator!=(const vector<T>& lhs, const vector<T>& rhs)
-    {
-        if (lhs.size() != rhs.size())
-            return true;
-        for (size_t idx = 0; idx < lhs.size(); ++idx)
-            if (lhs[idx] != rhs[idx])
-                return true;
-
-        return false;
-    }
-}
 
 
 namespace parser

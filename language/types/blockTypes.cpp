@@ -53,7 +53,7 @@ Block::Block(std::string label, std::string &&body)
 
 std::string Block::operator[] (const std::string &key)
 {
-    return properties.at(key);
+    return this->Block::properties.at(key);
 }
 
 /* *****************************************************************************
@@ -68,10 +68,12 @@ std::vector<std::string> IOBlock::getBlockProperties()
 std::vector<std::string> IOBlock::parseVars(std::string &&initList)
 {
     std::vector<std::string> varList;
-    for (auto bg = initList.begin(), next = std::find(bg, initList.end(), ',');
-            bg != initList.end(); bg = next, next = std::find(bg, initList.end(), ','))
+    for (auto bg = initList.begin(), next = std::find(bg + 1, initList.end(), ',');
+            bg < initList.end();)
     {
         varList.push_back( std::string(bg, next) );
+        bg = next + 1;
+        next = std::find(bg + 1, initList.end(), ',');
     }
 
     return varList;
@@ -79,15 +81,15 @@ std::vector<std::string> IOBlock::parseVars(std::string &&initList)
 
 IOBlock::IOBlock(std::string label, std::string &&block,
                  std::shared_ptr<std::map<std::string, double> > heap)
-: Block(std::move(label), std::move(block)), variablesHeap(heap)
+: Block(std::move(label), std::move(block)), variablesHeap(std::move(heap))
 {
     // getBlockProperties from IOBlock. Don`t use it for InitBlock
-    auto exceptedProps = getBlockProperties();
+    auto exceptedProps = IOBlock::getBlockProperties();
 
-    if (exceptedProps != misc::asKeys(properties))
+    if (exceptedProps.size() != properties.size())
          throw std::length_error(
-                 "Error while constructing " + blockLabel +
-                 " block: " +
+                 "Error while constructing \"" + blockLabel +
+                 "\" block: " +
                  ((exceptedProps.size() > properties.size()) ?
                  "Properties missing":
                  "Unrecognized properties") );
@@ -118,7 +120,7 @@ void OutputBlock::operator() (const std::vector<std::string> &outputVars)
     for (const auto &vr : outputVars)
         // assume vr is a comment if not in variablesHeap
         if (std::find_if(variablesHeap->begin(), variablesHeap->end(),
-                               [&vr] (const std::pair<std::string, int> &lhs)
+                               [&vr] (const std::pair<std::string, double> &lhs)
                                { return lhs.first == vr; }) != variablesHeap->end())
             std::cout << variablesHeap->at(vr) << ' ';
         else if (std::find_if(constants.begin(), constants.end(), [&vr]
@@ -146,7 +148,7 @@ std::vector<std::string> InitBlock::getBlockProperties()
 void InitBlock::operator()(const std::vector<std::string> &varList)
 {
     // note that elements of valueList need to be casted to double
-    auto valueList = parseVars(this->IOBlock::operator[]("Values"));
+    auto valueList = parseVars(this->IOBridge::operator[]("Values"));
     if (varList.size() > valueList.size())
         throw std::range_error("Not enough initializers");
     for (size_t idx = 0; idx < varList.size(); ++idx)
@@ -164,17 +166,17 @@ InitBlock::InitBlock(std::string label, std::string &&body,
                      std::shared_ptr<std::map<std::string, double> > heap)
 : IOBridge(std::move(label), std::move(body))
 {
-    this->IOBlock::variablesHeap = heap;
-    auto exceptedProps = getBlockProperties();
+    this->IOBlock::variablesHeap = std::move(heap);
+    auto exceptedProps = InitBlock::getBlockProperties();
 
-    if (exceptedProps != misc::asKeys(IOBlock::properties))
+    if (exceptedProps.size() != IOBridge::properties.size())
         throw std::length_error(
-                "Error while constructing " + IOBlock::blockLabel +
+                "Error while constructing " + IOBridge::blockLabel +
                 " block: " +
-                ((exceptedProps.size() > IOBlock::properties.size()) ?
+                ((exceptedProps.size() > IOBridge::properties.size()) ?
                  "Properties missing":
                  "Unrecognized properties") );
-    auto varList = parseVars( std::move(this->IOBlock::operator[]("Variables")) );
+    auto varList = parseVars( std::move(this->IOBridge::operator[]("Variables")) );
     this->operator()(varList);
 
 }
