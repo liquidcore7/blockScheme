@@ -38,7 +38,7 @@ std::map<std::string, std::string> Block::parseProps(std::string&& body)
 Block::Block(std::string label, std::string &&body)
 : blockLabel(std::move(label))
 {
-    auto gotPropList = parseProps(std::move(body));
+    properties = parseProps(std::move(body));
    // auto exceptedProps = getBlockProperties();
 
    /* if (exceptedProps.size() != gotPropList.size())
@@ -49,7 +49,6 @@ Block::Block(std::string label, std::string &&body)
                 "Properties missing":
                 "Unrecognized properties") ); */
     // there is a HUGE issue here. Do smth with getBlockProps, it calls for Block not for caller class
-    properties = gotPropList;
 }
 
 std::string Block::operator[] (const std::string &key)
@@ -82,13 +81,16 @@ IOBlock::IOBlock(std::string label, std::string &&block,
                  std::shared_ptr<std::map<std::string, double> > heap)
 : Block(std::move(label), std::move(block)), variablesHeap(heap)
 {
-    auto varList = parseVars( std::move(this->operator[]("Variables")) );
-    this->operator()(varList);
-}
+    // getBlockProperties from IOBlock. Don`t use it for InitBlock
+    auto exceptedProps = getBlockProperties();
 
-void IOBlock::operator()(const std::vector<std::string> &)
-{
-
+    if (exceptedProps != misc::asKeys(properties))
+         throw std::length_error(
+                 "Error while constructing " + blockLabel +
+                 " block: " +
+                 ((exceptedProps.size() > properties.size()) ?
+                 "Properties missing":
+                 "Unrecognized properties") );
 }
 
 
@@ -106,7 +108,10 @@ void InputBlock::operator()(const std::vector<std::string> &varList)
 InputBlock::InputBlock(std::string label, std::string &&block,
                        std::shared_ptr<std::map<std::string, double> > heap)
 : IOBlock(std::move(label), std::move(block), std::move(heap))
-{}
+{
+    auto varList = parseVars( std::move(this->operator[]("Variables")) );
+    this->operator()(varList);
+}
 
 void OutputBlock::operator() (const std::vector<std::string> &outputVars)
 {
@@ -116,6 +121,10 @@ void OutputBlock::operator() (const std::vector<std::string> &outputVars)
                                [&vr] (const std::pair<std::string, int> &lhs)
                                { return lhs.first == vr; }) != variablesHeap->end())
             std::cout << variablesHeap->at(vr) << ' ';
+        else if (std::find_if(constants.begin(), constants.end(), [&vr]
+                (const std::pair<std::string, double> &cnst)
+                { return cnst.first == vr;}) != constants.end())
+            std::cout << constants[vr] << ' ';
         else
             std::cout << vr << ' ';
 }
@@ -123,7 +132,10 @@ void OutputBlock::operator() (const std::vector<std::string> &outputVars)
 OutputBlock::OutputBlock(std::string label, std::string &&body,
                          std::shared_ptr<std::map<std::string, double> > heap)
 : IOBlock(std::move(label), std::move(body), std::move(heap))
-{}
+{
+    auto varList = parseVars( std::move(this->operator[]("Variables")) );
+    this->operator()(varList);
+}
 
 // TODO: support for initializer list-style variable definitions
 std::vector<std::string> InitBlock::getBlockProperties()
@@ -134,7 +146,7 @@ std::vector<std::string> InitBlock::getBlockProperties()
 void InitBlock::operator()(const std::vector<std::string> &varList)
 {
     // note that elements of valueList need to be casted to double
-    auto valueList = parseVars(this->operator[]("Values"));
+    auto valueList = parseVars(this->IOBlock::operator[]("Values"));
     if (varList.size() > valueList.size())
         throw std::range_error("Not enough initializers");
     for (size_t idx = 0; idx < varList.size(); ++idx)
@@ -150,8 +162,22 @@ void InitBlock::operator()(const std::vector<std::string> &varList)
 
 InitBlock::InitBlock(std::string label, std::string &&body,
                      std::shared_ptr<std::map<std::string, double> > heap)
-: IOBlock(std::move(label), std::move(body), std::move(heap))
-{}
+: IOBridge(std::move(label), std::move(body))
+{
+    this->IOBlock::variablesHeap = heap;
+    auto exceptedProps = getBlockProperties();
+
+    if (exceptedProps != misc::asKeys(IOBlock::properties))
+        throw std::length_error(
+                "Error while constructing " + IOBlock::blockLabel +
+                " block: " +
+                ((exceptedProps.size() > IOBlock::properties.size()) ?
+                 "Properties missing":
+                 "Unrecognized properties") );
+    auto varList = parseVars( std::move(this->IOBlock::operator[]("Variables")) );
+    this->operator()(varList);
+
+}
 
 
 /* ***********************************************************************************************

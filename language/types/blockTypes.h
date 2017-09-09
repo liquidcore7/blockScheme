@@ -13,7 +13,7 @@
 #include <iostream>
 #include <map>
 
-#include "expressionFolder.hpp"
+#include "expressionFolder.h"
 
 struct Block
 {
@@ -38,7 +38,6 @@ struct IOBlock : public Block
     ~IOBlock() override = default;
 
     std::vector<std::string> getBlockProperties() override;
-    virtual void operator() (const std::vector<std::string>&);
 
 protected:
     std::shared_ptr< std::map<std::string, double> > variablesHeap;
@@ -52,7 +51,7 @@ struct InputBlock : public IOBlock
                std::shared_ptr<std::map<std::string, double> >);
     ~InputBlock() override = default;
 
-    void operator() (const std::vector<std::string>&) override;
+    void operator() (const std::vector<std::string>&);
 };
 
 struct OutputBlock : public IOBlock
@@ -62,10 +61,19 @@ struct OutputBlock : public IOBlock
                 std::shared_ptr<std::map<std::string, double> >);
     ~OutputBlock() override = default;
 
-    void operator() (const std::vector<std::string>&) override;
+    void operator() (const std::vector<std::string>&);
 };
 
-struct InitBlock : public IOBlock
+// pass by IOBlock constructor
+struct IOBridge : public Block
+{
+    IOBridge() : Block() {}
+    IOBridge(std::string a, std::string&&b) : Block(std::move(a), std::move(b))
+    {}
+    ~IOBridge() override = default;
+};
+
+struct InitBlock : public IOBlock, IOBridge
 {
     InitBlock() : IOBlock() {};
     InitBlock(std::string, std::string&&,
@@ -73,7 +81,7 @@ struct InitBlock : public IOBlock
     ~InitBlock() override = default;
 
     std::vector<std::string> getBlockProperties() override;
-    void operator() (const std::vector<std::string>&) override;
+    void operator() (const std::vector<std::string>&);
 };
 
 struct SwitchBlock : public Block
