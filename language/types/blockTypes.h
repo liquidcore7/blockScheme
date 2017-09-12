@@ -18,15 +18,19 @@
 struct Block
 {
     Block() = default;
-    Block(std::string, std::string&&);
+    Block(std::string, std::string&&,
+          std::shared_ptr<std::map<std::string, double> >);
     virtual ~Block() = default;
 
     virtual std::vector<std::string> getBlockProperties();
     std::string operator[] (const std::string&);
+    std::shared_ptr<std::map<std::string, double> >
+            getHeapPtr() const;
 
 protected:
     std::string blockLabel;
     std::map<std::string, std::string> properties;
+    std::shared_ptr<std::map<std::string, double> > varHeap;
     static std::map<std::string, std::string> parseProps(std::string&&);
 };
 
@@ -40,7 +44,6 @@ struct IOBlock : public Block
     std::vector<std::string> getBlockProperties() override;
 
 protected:
-    std::shared_ptr< std::map<std::string, double> > variablesHeap;
     static std::vector<std::string> parseVars(std::string&&);
 };
 
@@ -64,24 +67,15 @@ struct OutputBlock : public IOBlock
     void operator() (const std::vector<std::string>&);
 };
 
-// pass by IOBlock constructor
-struct IOBridge : public Block
-{
-    IOBridge() : Block() {}
-    IOBridge(std::string a, std::string&&b) : Block(std::move(a), std::move(b))
-    {}
-    ~IOBridge() override = default;
-};
-
-struct InitBlock : public IOBlock, IOBridge
+struct InitBlock : public IOBlock
 {
     InitBlock() : IOBlock() {};
     InitBlock(std::string, std::string&&,
               std::shared_ptr<std::map<std::string, double> >);
     ~InitBlock() override = default;
 
-    std::vector<std::string> getBlockProperties() override;
     void operator() (const std::vector<std::string>&);
+
 };
 
 struct SwitchBlock : public Block
@@ -92,7 +86,7 @@ struct SwitchBlock : public Block
     ~SwitchBlock() override  = default;
 
     std::vector<std::string> getBlockProperties() override;
-
+    void operator() ();
 };
 
 

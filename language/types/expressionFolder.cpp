@@ -56,7 +56,7 @@ namespace misc
 
 namespace parser
 {
-    double parseBinCmp(const std::string& Cmp,
+    bool parseBinCmp(const std::string& Cmp,
                        const std::shared_ptr< std::map<std::string, double> > &additional)
     {
         auto relation = Cmp.find_first_of("<>=");
