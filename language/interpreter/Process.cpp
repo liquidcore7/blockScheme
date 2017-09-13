@@ -6,14 +6,16 @@
 
 std::pair<std::string, std::string> Process::readBlock(const std::string &label)
 {
+
+    std::ifstream streamHandle(filename);
     std::string rdBuf;
     // find block`s begin
     do  {
-        getline(*streamHandle, rdBuf);
-    } while (!streamHandle->eof() &&
+        getline(streamHandle, rdBuf);
+    } while (!streamHandle.eof() &&
             rdBuf.find(label) == std::string::npos);
     // throws if reading was terminated due to EOF
-    if (streamHandle->eof())
+    if (streamHandle.eof())
         throw std::logic_error("No \"" + label + "\" block found");
     std::string blockType;
     auto delimiterPos = rdBuf.find(':');
@@ -22,33 +24,31 @@ std::pair<std::string, std::string> Process::readBlock(const std::string &label)
     blockType = rdBuf.substr(delimiterPos + 1, rdBuf.find_first_of("\n {") - delimiterPos);
     // devnulls the block`s opening symbol
     if (rdBuf.find('{') == std::string::npos)
-        getline(*streamHandle, rdBuf);
+        getline(streamHandle, rdBuf);
     // block body is saved here
     std::string accu;
     do {
-        getline(*streamHandle, rdBuf);
+        getline(streamHandle, rdBuf);
         accu += rdBuf;
         accu.push_back('\n');
     }
-    while (!streamHandle->eof() &&
+    while (!streamHandle.eof() &&
             rdBuf.find('}') == std::string::npos);
 
-    if (streamHandle->eof())
+    if (streamHandle.eof())
         throw std::runtime_error("Unexpected EOF while reading \"" +
                                          label + "\" block body");
     return {accu, blockType};
 }
 
-Process::Process(const std::string &filename)
-:   memoryHeap(new std::map<std::string, double>)
+Process::Process(const std::string &_filename)
+:   memoryHeap(new std::map<std::string, double>), filename(_filename)
 {
-    streamHandle = new std::ifstream(filename);
     current = new Block("Begin", std::move(readBlock("Begin").first), memoryHeap);
 }
 
 Process::~Process()
 {
-    delete streamHandle;
     delete current;
 }
 
@@ -82,5 +82,11 @@ void Process::nextStep()
         current = new SwitchBlock(std::move(lbl), std::move(accu), memoryHeap);
     else
         throw std::logic_error("Block type not recognized");
+}
+
+void Process::operator()()
+{
+    while ((*current)["Next"] != "None")
+        nextStep();
 }
 
