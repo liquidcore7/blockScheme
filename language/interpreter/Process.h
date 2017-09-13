@@ -15,7 +15,10 @@ struct Process
     void nextStep();
     void operator() ();
 
-    decltype(memoryHeap) getHeap() const;
+    std::shared_ptr<std::map<std::string, double> >
+    getHeap() const;
+
+    void dbg();
 
     ~Process();
 

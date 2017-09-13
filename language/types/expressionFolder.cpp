@@ -51,6 +51,11 @@ namespace misc
             delete op.second;
     }
 
+    bool startsWith(const std::string& l, const std::string& r)
+    {
+        return l.substr(0, r.size()) == r;
+    }
+
 };
 
 
@@ -83,7 +88,7 @@ namespace parser
         auto opr = Op.find_first_of("+-*/^%");
 
         if (opr == std::string::npos)
-            return misc::stod(Op);
+            return misc::stod(Op, additional);
 
         std::string left = Op.substr(0, opr), right = Op.substr(opr + 1);
         return operations[ Op[opr] ]->operator()

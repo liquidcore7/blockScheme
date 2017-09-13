@@ -16,19 +16,23 @@ std::vector<std::string> Block::getBlockProperties()
 // TODO: custom exception class with block info
 std::map<std::string, std::string> Block::parseProps(std::string&& body)
 {
-    std::istringstream stream(std::move(body));
-    std::string tempLine = " ";
+    std::istringstream stream(body);
+    std::string tempLine;
     std::map<std::string, std::string> propMap;
 
-    while (getline(stream, tempLine) && !tempLine.empty())
+    while (getline(stream, tempLine))
     {
-        auto delimiter = std::find(tempLine.begin(), tempLine.end(), ':');
-        if (delimiter == tempLine.end())
-            throw std::runtime_error("No delimiter found");
+        if (!tempLine.empty())
+        {
+            auto delimiter = std::find(tempLine.begin(), tempLine.end(), ':');
+            if (delimiter == tempLine.end())
+                throw std::runtime_error("No delimiter found");
 
-        propMap.insert({std::string(tempLine.begin(), delimiter),
-                        std::string(delimiter + 1, tempLine.end())
-                       });
+            propMap.insert({std::string(tempLine.begin(), delimiter),
+                            std::string(delimiter + 1, tempLine.end())
+                           });
+        }
+
     }
 
     return propMap;
@@ -103,7 +107,7 @@ void InputBlock::operator()(const std::vector<std::string> &varList)
     }
 }
 
-InputBlock::InputBlock(std::string label, std::string &&block,
+InputBlock::InputBlock(std::string label, std::string&& block,
                        std::shared_ptr<std::map<std::string, double> > heap)
 : IOBlock(std::move(label), std::move(block), std::move(heap))
 {
