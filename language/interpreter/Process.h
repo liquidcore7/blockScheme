@@ -23,7 +23,8 @@ private:
     Block* current;
     std::ifstream* streamHandle;
     std::shared_ptr<std::map<std::string, double> > memoryHeap;
-    std::string readBlock(const std::string&);
+    //        block body , block type
+    std::pair<std::string, std::string> readBlock(const std::string&);
 };
 
 
