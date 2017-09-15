@@ -2,6 +2,7 @@
 // Created by liquidcore7 on 9/7/17.
 //
 
+#include <iostream>
 #include "expressionFolder.h"
 
 bool BinCmp::operator()(double, double)
@@ -56,6 +57,17 @@ namespace misc
         return l.substr(0, r.size()) == r;
     }
 
+    auto positionalFind(std::string rng, const std::string& query) -> decltype(rng.begin())
+    {
+        for (const auto& searchToken : query)
+        {
+            auto hit = std::find(rng.begin(), rng.end(), searchToken);
+            if (hit != rng.end())
+                return hit;
+        }
+        return rng.end();
+    }
+
 };
 
 
@@ -93,6 +105,91 @@ namespace parser
         std::string left = Op.substr(0, opr), right = Op.substr(opr + 1);
         return operations[ Op[opr] ]->operator()
                 (misc::stod(left, additional), misc::stod(right, additional));
+    }
+
+    std::string evalExpression(std::string Exp,
+                          const std::shared_ptr<std::map<std::string, double> > &varHeap)
+    {
+        // order is important here
+        std::string operations("^*/%-+");
+
+        // finds and evaluates all parenthesized expressions, as their
+        // evaluation priority is highest
+        auto parenth = std::find(Exp.begin(), Exp.end(), '(');
+        while (parenth != Exp.end())
+        {
+            auto parenthClose = std::find(parenth + 1, Exp.end(), ')');
+            // fixes things like (a*(b+c)) by moving the expression begin
+            // to next parenthesis
+            for (auto walk = parenth + 1; walk < parenthClose; ++walk)
+                if (*walk == '(')
+                    parenth = walk;
+
+            std::string innerExp(parenth + 1, parenthClose),
+                    evaluated = evalExpression(innerExp, varHeap);
+            // insert the evaluated part into original string
+            auto inserter = Exp.erase(parenth, parenthClose + 1);
+            Exp.insert(inserter, evaluated.begin(), evaluated.end());
+            parenth = std::find(Exp.begin(), Exp.end(), '(');
+        }
+
+        auto opPos = misc::positionalFind(Exp, operations);
+        std::cout << *opPos << ' ' << *(opPos + 1) << ' ' << *(opPos - 1) << '\n';
+        while (opPos < Exp.end())
+        {
+            auto opBegin = Exp.begin();
+            std::cout << *opPos << ' ' << *(opPos + 1) << ' ' << *(opPos - 1) << '\n';
+            // problematically to solve with STL algorithms (reverse_iter cast)
+            for (auto bg = opPos; bg > Exp.begin(); --bg)
+            {
+                std::cout << *bg << ' ';
+                if (operations.find(*(bg - 1)) != std::string::npos)
+                {
+                    opBegin = bg;
+                    break;
+                }
+            }
+            std::cout << *opPos << ' ' << *(opPos + 1) << ' ' << *(opPos - 1) << '\n';
+                std::cout << std::endl;
+            auto opEnd = Exp.end();
+
+            for (auto bg = opPos + 1; bg < Exp.end(); ++bg)
+                if (operations.find(*bg) != std::string::npos)
+                {
+                    opEnd = bg;
+                    break;
+                }
+
+            std::string tmp(opBegin, opEnd);
+            std::string evaluated = std::to_string(
+                    parser::parseBinOp(tmp, varHeap)
+            );
+            auto inserter = Exp.erase(opBegin, opEnd)++;
+            Exp.insert(inserter, evaluated.begin(), evaluated.end());
+            opPos = misc::positionalFind(Exp, operations);
+        }
+
+	    return Exp;
+    }
+
+    bool foldComparsion(const std::string &Cmp,
+                        const std::shared_ptr<std::map<std::string, double> > &varHeap)
+    {
+        auto relation = Cmp.find_first_of("<>=");
+
+        if (relation == std::string::npos)
+            throw std::logic_error("Not a comparison");
+
+        std::string left = Cmp.substr(0, relation), right = Cmp.substr(relation + 1),
+                comp = Cmp.substr(relation, 1);
+
+        if (Cmp.find('=', relation + 1) != std::string::npos)
+        {
+            right = right.substr(1);
+            comp.push_back(Cmp[relation + 1]);
+        }
+        left = evalExpression(left, varHeap), right = evalExpression(right, varHeap);
+        return parser::parseBinCmp(left + comp + right, varHeap);
     }
 
 };

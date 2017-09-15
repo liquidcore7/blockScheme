@@ -99,6 +99,7 @@ void Process::operator()()
         nextStep();
 }
 
+// looks too ugly, rewrite or remove
 void Process::dbg()
 {
     while ((*current)["Next"] != "None")
