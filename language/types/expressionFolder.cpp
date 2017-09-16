@@ -68,6 +68,19 @@ namespace misc
         return rng.end();
     }
 
+    std::vector<std::string> split(const std::string &source, const std::string &delimList)
+    {
+        std::vector<std::string> sequence;
+        for (auto bg = source.begin(); bg != source.end();)
+        {
+            auto next = std::find_if(delimList.begin(), delimList.end(), [&bg]
+                    (const char& x) { return x == *bg;});
+            sequence.emplace_back(bg, next);
+            bg = next;
+        }
+        return sequence;
+    }
+
 };
 
 
@@ -134,23 +147,18 @@ namespace parser
         }
 
         auto opPos = misc::positionalFind(Exp, operations);
-        std::cout << *opPos << ' ' << *(opPos + 1) << ' ' << *(opPos - 1) << '\n';
         while (opPos < Exp.end())
         {
             auto opBegin = Exp.begin();
-            std::cout << *opPos << ' ' << *(opPos + 1) << ' ' << *(opPos - 1) << '\n';
             // problematically to solve with STL algorithms (reverse_iter cast)
             for (auto bg = opPos; bg > Exp.begin(); --bg)
             {
-                std::cout << *bg << ' ';
                 if (operations.find(*(bg - 1)) != std::string::npos)
                 {
                     opBegin = bg;
                     break;
                 }
             }
-            std::cout << *opPos << ' ' << *(opPos + 1) << ' ' << *(opPos - 1) << '\n';
-                std::cout << std::endl;
             auto opEnd = Exp.end();
 
             for (auto bg = opPos + 1; bg < Exp.end(); ++bg)
