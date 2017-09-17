@@ -2,7 +2,6 @@
 // Created by liquidcore7 on 9/7/17.
 //
 
-#include <iostream>
 #include "expressionFolder.h"
 
 bool BinCmp::operator()(double, double)
@@ -21,7 +20,9 @@ namespace misc
 
     bool isNum(const std::string &num)
     {
-        return std::all_of(num.begin(), num.end(), [](const char &digit) { return (isdigit(digit) || digit == '.'); });
+        return std::all_of(num.begin(), num.end(), [](const char &digit) { return (isdigit(digit)
+                                                                                   || digit == '.'
+                                                                                   || digit == '-'); });
     }
 
     std::string lower(std::string &&arg)
@@ -33,6 +34,8 @@ namespace misc
 
     double stod(std::string var, const std::shared_ptr< std::map<std::string, double> > &additional)
     {
+        if (var.empty())
+            var = "0.0";
         // if additional variables heap exists and var is found there, grab it from heap
         if (additional)
             if (std::find_if(additional->begin(), additional->end(),
@@ -57,11 +60,11 @@ namespace misc
         return l.substr(0, r.size()) == r;
     }
 
-    auto positionalFind(std::string rng, const std::string& query) -> decltype(rng.begin())
+    auto positionalFind(const std::vector<std::string> &rng, const std::string& query) -> decltype(rng.begin())
     {
         for (const auto& searchToken : query)
         {
-            auto hit = std::find(rng.begin(), rng.end(), searchToken);
+            auto hit = std::find(rng.begin(), rng.end(), std::string(1, searchToken));
             if (hit != rng.end())
                 return hit;
         }
@@ -71,14 +74,36 @@ namespace misc
     std::vector<std::string> split(const std::string &source, const std::string &delimList)
     {
         std::vector<std::string> sequence;
-        for (auto bg = source.begin(); bg != source.end();)
+        auto bg = source.begin();
+        if (*bg == '-')
+            ++bg;
+        auto next = bg;
+        for (bg, next; bg < source.end(); ++next)
         {
-            auto next = std::find_if(delimList.begin(), delimList.end(), [&bg]
-                    (const char& x) { return x == *bg;});
-            sequence.emplace_back(bg, next);
-            bg = next;
+            if (next == source.end())
+            {
+                sequence.emplace_back(bg, next);
+                return sequence;
+            }
+            bool match = std::any_of(delimList.begin(), delimList.end(), [&next]
+                    (const char& x) { return x == *next;});
+            if (match)
+            {
+                if (bg != next)
+                    sequence.emplace_back(bg, next);
+                sequence.emplace_back(1, *next);
+                bg = next + 1;
+            }
+
         }
-        return sequence;
+    }
+
+    std::string join(const std::string& delimiter, const std::vector<std::string>& source)
+    {
+        std::string joined;
+        for (const auto& elem : source)
+            joined += elem + delimiter;
+        return joined.substr(0, joined.size() - delimiter.size());
     }
 
 };
@@ -110,7 +135,7 @@ namespace parser
     double parseBinOp(const std::string& Op,
                       const std::shared_ptr< std::map<std::string, double> > &additional)
     {
-        auto opr = Op.find_first_of("+-*/^%");
+        auto opr = Op.find_first_of("+*/^%-", 1);
 
         if (opr == std::string::npos)
             return misc::stod(Op, additional);
@@ -120,66 +145,52 @@ namespace parser
                 (misc::stod(left, additional), misc::stod(right, additional));
     }
 
+    // TODO: remove binOp
     std::string evalExpression(std::string Exp,
                           const std::shared_ptr<std::map<std::string, double> > &varHeap)
     {
         // order is important here
-        std::string operations("^*/%-+");
+        std::string operators("()^*/%-+");
 
-        // finds and evaluates all parenthesized expressions, as their
-        // evaluation priority is highest
-        auto parenth = std::find(Exp.begin(), Exp.end(), '(');
-        while (parenth != Exp.end())
+        auto expSequence = misc::split(Exp, operators);
+        auto prBegin = std::find(expSequence.begin(), expSequence.end(), "(");
+        while (prBegin != expSequence.end())
         {
-            auto parenthClose = std::find(parenth + 1, Exp.end(), ')');
-            // fixes things like (a*(b+c)) by moving the expression begin
-            // to next parenthesis
-            for (auto walk = parenth + 1; walk < parenthClose; ++walk)
-                if (*walk == '(')
-                    parenth = walk;
+            auto prEnd = std::find(prBegin, expSequence.end(), ")");
 
-            std::string innerExp(parenth + 1, parenthClose),
-                    evaluated = evalExpression(innerExp, varHeap);
-            // insert the evaluated part into original string
-            auto inserter = Exp.erase(parenth, parenthClose + 1);
-            Exp.insert(inserter, evaluated.begin(), evaluated.end());
-            parenth = std::find(Exp.begin(), Exp.end(), '(');
-        }
+            for (auto walk = prBegin + 1; walk < prEnd; ++walk)
+                if (*walk == "(")
+                    prBegin = walk;
 
-        auto opPos = misc::positionalFind(Exp, operations);
-        while (opPos < Exp.end())
-        {
-            auto opBegin = Exp.begin();
-            // problematically to solve with STL algorithms (reverse_iter cast)
-            for (auto bg = opPos; bg > Exp.begin(); --bg)
-            {
-                if (operations.find(*(bg - 1)) != std::string::npos)
-                {
-                    opBegin = bg;
-                    break;
-                }
-            }
-            auto opEnd = Exp.end();
-
-            for (auto bg = opPos + 1; bg < Exp.end(); ++bg)
-                if (operations.find(*bg) != std::string::npos)
-                {
-                    opEnd = bg;
-                    break;
-                }
-
-            std::string tmp(opBegin, opEnd);
-            std::string evaluated = std::to_string(
-                    parser::parseBinOp(tmp, varHeap)
+            std::string parsed = evalExpression(
+                    misc::join("", std::vector<std::string>(prBegin + 1, prEnd)),
+                    varHeap
             );
-            auto inserter = Exp.erase(opBegin, opEnd)++;
-            Exp.insert(inserter, evaluated.begin(), evaluated.end());
-            opPos = misc::positionalFind(Exp, operations);
+            auto inserter = expSequence.erase(prBegin, prEnd + 1);
+            expSequence.insert(inserter, parsed);
+
+            prBegin = std::find(expSequence.begin(), expSequence.end(), "(");
         }
 
-	    return Exp;
+        auto expBegin = misc::positionalFind(expSequence, operators);
+        while (expBegin != expSequence.end())
+        {
+            std::string parsed = std::to_string( parseBinOp(
+                    misc::join("", std::vector<std::string>(expBegin - 1, expBegin + 2)),
+                    varHeap
+            ));
+
+            auto inserter = expSequence.erase(expBegin - 1, expBegin + 2);
+            expSequence.insert(inserter, parsed);
+
+
+            expBegin = misc::positionalFind(expSequence, operators);
+        }
+
+        return misc::join("", expSequence);
     }
 
+    // TODO: remove binCmp
     bool foldComparsion(const std::string &Cmp,
                         const std::shared_ptr<std::map<std::string, double> > &varHeap)
     {

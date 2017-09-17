@@ -146,9 +146,11 @@ namespace misc
     bool startsWith(const std::string&, const std::string&);
 
     // similar to find_first_of, but the order of queries in second arg matters
-    auto positionalFind(std::string rng, const std::string& query) -> decltype(rng.begin());
+    auto positionalFind(const std::vector<std::string>& rng, const std::string& query) -> decltype(rng.begin());
 
     std::vector<std::string> split(const std::string&, const std::string&);
+
+    std::string join(const std::string&, const std::vector<std::string>&);
 };
 
 
