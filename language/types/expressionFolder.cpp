@@ -74,10 +74,7 @@ namespace misc
     std::vector<std::string> split(const std::string &source, const std::string &delimList)
     {
         std::vector<std::string> sequence;
-        auto bg = source.begin();
-        if (*bg == '-')
-            ++bg;
-        auto next = bg;
+        auto bg = source.begin(), next = bg + 1;
         for (bg, next; bg < source.end(); ++next)
         {
             if (next == source.end())
