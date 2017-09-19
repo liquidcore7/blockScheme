@@ -17,14 +17,16 @@ double BinOp::operator()(double, double)
 
 namespace misc
 {
-
+    // TODO: rewrite with regexp
     bool isNum(const std::string &num)
     {
-        return std::all_of(num.begin(), num.end(), [](const char &digit) { return (isdigit(digit)
-                                                                                   || digit == '.'
-                                                                                   || digit == '-'); });
+        return ( (num[0] == '-' || isdigit(num[0]) )
+                 && std::all_of(num.begin() + 1, num.end(),
+                                [](const char &digit) { return (isdigit(digit) || digit == '.');})
+        );
     }
 
+    // pi can be marked as Pi or PI
     std::string lower(std::string &&arg)
     {
         for (auto &c : arg)
@@ -34,8 +36,6 @@ namespace misc
 
     double stod(std::string var, const std::shared_ptr< std::map<std::string, double> > &additional)
     {
-        if (var.empty())
-            var = "0.0";
         // if additional variables heap exists and var is found there, grab it from heap
         if (additional)
             if (std::find_if(additional->begin(), additional->end(),
@@ -60,134 +60,126 @@ namespace misc
         return l.substr(0, r.size()) == r;
     }
 
-    auto positionalFind(const std::vector<std::string> &rng, const std::string& query) -> decltype(rng.begin())
+
+    bool isOperator(const char &c)
     {
-        for (const auto& searchToken : query)
-        {
-            auto hit = std::find(rng.begin(), rng.end(), std::string(1, searchToken));
-            if (hit != rng.end())
-                return hit;
-        }
-        return rng.end();
+        const std::string operators("()^*/%+-");
+        return operators.find(c) != std::string::npos;
     }
-
-    std::vector<std::string> split(const std::string &source, const std::string &delimList)
-    {
-        std::vector<std::string> sequence;
-        auto bg = source.begin(), next = bg + 1;
-        for (bg, next; bg < source.end(); ++next)
-        {
-            if (next == source.end())
-            {
-                sequence.emplace_back(bg, next);
-                return sequence;
-            }
-            bool match = std::any_of(delimList.begin(), delimList.end(), [&next]
-                    (const char& x) { return x == *next;});
-            if (match)
-            {
-                if (bg != next)
-                    sequence.emplace_back(bg, next);
-                sequence.emplace_back(1, *next);
-                bg = next + 1;
-            }
-
-        }
-    }
-
-    std::string join(const std::string& delimiter, const std::vector<std::string>& source)
-    {
-        std::string joined;
-        for (const auto& elem : source)
-            joined += elem + delimiter;
-        return joined.substr(0, joined.size() - delimiter.size());
-    }
-
 };
 
 
 namespace parser
 {
-    bool parseBinCmp(const std::string& Cmp,
-                       const std::shared_ptr< std::map<std::string, double> > &additional)
+
+    numOpVariant::numOpVariant(double arg)
+            : _val(arg), _contains(0)
+    {}
+
+    numOpVariant::numOpVariant(char arg)
+            : _op(arg), _contains(1)
+    {}
+
+    bool numOpVariant::hasOperator() const
     {
-        auto relation = Cmp.find_first_of("<>=");
-
-        if (relation == std::string::npos)
-            throw std::logic_error("Not a binary comparison");
-
-        std::string left = Cmp.substr(0, relation), right = Cmp.substr(relation + 1),
-                comp = Cmp.substr(relation, 1);
-        if (Cmp.find('=', relation + 1) != std::string::npos)
-        {
-            right = right.substr(1);
-            comp.push_back(Cmp[relation + 1]);
-        }
-
-        return comparisons[comp]->operator()
-                (misc::stod(left, additional), misc::stod(right, additional));
-
+        return _contains;
     }
 
-    double parseBinOp(const std::string& Op,
-                      const std::shared_ptr< std::map<std::string, double> > &additional)
+    template <typename T>
+    T numOpVariant::get() const
     {
-        auto opr = Op.find_first_of("+*/^%-", 1);
-
-        if (opr == std::string::npos)
-            return misc::stod(Op, additional);
-
-        std::string left = Op.substr(0, opr), right = Op.substr(opr + 1);
-        return operations[ Op[opr] ]->operator()
-                (misc::stod(left, additional), misc::stod(right, additional));
+        if (hasOperator())
+            return _op;
+        else
+            return _val;
     }
 
-    // TODO: remove binOp
-    std::string evalExpression(std::string Exp,
-                          const std::shared_ptr<std::map<std::string, double> > &varHeap)
+
+
+    Expression::Expression(const std::string &source,
+            const std::shared_ptr<std::map<std::string, double> >& vmap)
+    : varMap(vmap)
     {
-        // order is important here
-        std::string operators("()^*/%-+");
-
-        auto expSequence = misc::split(Exp, operators);
-        auto prBegin = std::find(expSequence.begin(), expSequence.end(), "(");
-        while (prBegin != expSequence.end())
+        auto bg = source.begin(), next = bg + 1;
+        for (bg, next; bg < source.end(); ++next)
         {
-            auto prEnd = std::find(prBegin, expSequence.end(), ")");
+            if (next == source.end())
+            {
+                expArr.emplace_back(
+                        misc::stod( std::string(bg, next), varMap)
+                );
+                break;
+            }
 
-            for (auto walk = prBegin + 1; walk < prEnd; ++walk)
-                if (*walk == "(")
-                    prBegin = walk;
+            if (misc::isOperator(*next))
+            {
+                if (bg != next)
+                    expArr.emplace_back(
+                            misc::stod( std::string(bg, next), varMap) );
+                expArr.emplace_back(*next);
+                bg = next + 1;
+            }
+        } // end for
+    }
 
-            std::string parsed = evalExpression(
-                    misc::join("", std::vector<std::string>(prBegin + 1, prEnd)),
-                    varHeap
-            );
-            auto inserter = expSequence.erase(prBegin, prEnd + 1);
-            expSequence.insert(inserter, parsed);
+    Expression::Expression(std::vector<parser::numOpVariant> prevExp,
+                           const std::shared_ptr<std::map<std::string, double> > &vmap)
+    : expArr(std::move(prevExp)), varMap(vmap)
+    {}
 
-            prBegin = std::find(expSequence.begin(), expSequence.end(), "(");
-        }
 
-        auto expBegin = misc::positionalFind(expSequence, operators);
-        while (expBegin != expSequence.end())
+    It Expression::find_op(const char &op) const
+    {
+        return std::find_if(expArr.begin(), expArr.end(), [&op]
+                (const numOpVariant& v)
         {
-            std::string parsed = std::to_string( parseBinOp(
-                    misc::join("", std::vector<std::string>(expBegin - 1, expBegin + 2)),
-                    varHeap
+            if (v.hasOperator())
+                return v.get<char>() == op;
+            else
+                return false;
+        });
+    }
+
+    double Expression::calculate()
+    {
+        // take care of brackets
+        auto openBr = find_op('('), closeBr = find_op(')');
+
+        while (openBr != expArr.end())
+        {
+            for (auto walker = openBr; walker < closeBr; ++walker)
+                if (walker->hasOperator())
+                    if (walker->get<char>() == '(')
+                        openBr = walker; // openBr now points to closest to closeBr bracket
+
+            std::vector<parser::numOpVariant> innerExp(openBr + 1, closeBr);
+            auto insertPos = expArr.erase(openBr, closeBr + 1);
+            expArr.insert(insertPos, parser::numOpVariant(
+                    Expression(innerExp, varMap).calculate()
             ));
 
-            auto inserter = expSequence.erase(expBegin - 1, expBegin + 2);
-            expSequence.insert(inserter, parsed);
-
-
-            expBegin = misc::positionalFind(expSequence, operators);
+            openBr = find_op('('), closeBr = find_op(')');
         }
 
-        return misc::join("", expSequence);
+        const std::string opQueue("^*/%+-");
+        for (const auto &op : opQueue)
+        {
+            auto opPos = find_op(op);
+            while (opPos != expArr.end())
+            {
+                double a = (opPos - 1)->get<double>(), b = (opPos + 1)->get<double>();
+                double result = operations[opPos->get<char>()]->operator() (a, b);
+                auto insertPos = expArr.erase(opPos - 1, opPos + 2);
+                expArr.insert(insertPos, numOpVariant(result));
+
+                opPos = find_op(op);
+            }
+        }
+        return expArr.front().get<double>();
     }
 
-    // TODO: remove binCmp
+
+
     bool foldComparsion(const std::string &Cmp,
                         const std::shared_ptr<std::map<std::string, double> > &varHeap)
     {
@@ -204,8 +196,15 @@ namespace parser
             right = right.substr(1);
             comp.push_back(Cmp[relation + 1]);
         }
-        left = evalExpression(left, varHeap), right = evalExpression(right, varHeap);
-        return parser::parseBinCmp(left + comp + right, varHeap);
+
+        double a = Expression(left, varHeap).calculate(), b = Expression(right, varHeap).calculate();
+        return comparisons[comp]->operator()(a, b);
     }
 
-};
+    double evalExpression(const std::string &Exp,
+                          const std::shared_ptr<std::map<std::string, double> > &vmap)
+    {
+        return Expression(Exp, vmap).calculate();
+    }
+
+}; // namespace parser

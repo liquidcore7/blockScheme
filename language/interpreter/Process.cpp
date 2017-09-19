@@ -99,16 +99,18 @@ void Process::operator()()
         nextStep();
 }
 
-// looks too ugly, rewrite or remove
+// output looks too ugly, rewrite or remove
 void Process::dbg()
 {
     while ((*current)["Next"] != "None")
     {
-        nextStep();
+        std::cout << "[" + current->getLabel() + "]:" << std::endl;
         std::cout << "Next:" << (*current)["Next"] << '\n';
+
         std::cout << "Heap:\n" << "Variables\t\tValues\n";
         for (const auto &x : *memoryHeap)
-            std::cout << x.first << "\t\t" << x.second << std::endl;
+            std::cout << x.first << "\t\t\t" << x.second << std::endl;
+        nextStep();
     }
 
 }

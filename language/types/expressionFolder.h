@@ -134,23 +134,9 @@ namespace misc
     // run it at the end of program execution
     void _cleanup();
 
-    template <typename K, typename V>
-    std::vector<K> asKeys(const std::map<K, V>& mp)
-    {
-        std::vector<K> keys(mp.size());
-        for (const auto &pair : mp)
-            keys.push_back(pair.first);
-        return keys;
-    }
-
     bool startsWith(const std::string&, const std::string&);
 
-    // similar to find_first_of, but the order of queries in second arg matters
-    auto positionalFind(const std::vector<std::string>& rng, const std::string& query) -> decltype(rng.begin());
-
-    std::vector<std::string> split(const std::string&, const std::string&);
-
-    std::string join(const std::string&, const std::vector<std::string>&);
+    bool isOperator(const char&);
 };
 
 
@@ -170,13 +156,37 @@ bool operator!=(const std::vector<T>& lhs, const std::vector<T>& rhs)
 
 namespace parser
 {
-    bool parseBinCmp(const std::string& Cmp,
-                       const std::shared_ptr< std::map<std::string, double> >& = nullptr);
+    // std::variant needs c++17 which is absolute overhead here
+    class numOpVariant
+    {
+        double _val;
+        char _op;
+        // 0 for double and 1 for char
+        bool _contains;
+    public:
+        explicit numOpVariant(double);
+        explicit numOpVariant(char);
+        bool hasOperator() const;
+        template <typename T>
+        T get() const;
+    };
 
-    double parseBinOp(const std::string& Op,
-                      const std::shared_ptr< std::map<std::string, double> >& = nullptr);
+    using It = std::vector<parser::numOpVariant>::const_iterator;
+    class Expression
+    {
+        std::vector<parser::numOpVariant> expArr;
+        std::shared_ptr< std::map<std::string, double> > varMap;
+        It find_op(const char&) const;
+    public:
+        explicit Expression(const std::string&,
+                   const std::shared_ptr<std::map<std::string, double> >& = nullptr);
+        explicit Expression(std::vector<parser::numOpVariant>,
+                   const std::shared_ptr<std::map<std::string, double> >& = nullptr);
 
-    std::string evalExpression(std::string Exp,
+        double calculate();
+    };
+
+    double evalExpression(const std::string& Exp,
                           const std::shared_ptr< std::map<std::string, double> >& = nullptr);
 
     bool foldComparsion(const std::string& Cmp,

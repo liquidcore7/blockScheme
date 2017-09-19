@@ -24,8 +24,7 @@ struct Block
 
     virtual std::vector<std::string> getBlockProperties();
     std::string operator[] (const std::string&);
-    std::shared_ptr<std::map<std::string, double> >
-            getHeapPtr() const;
+    std::string getLabel() const;
 
 protected:
     std::string blockLabel;

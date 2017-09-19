@@ -51,9 +51,9 @@ std::string Block::operator[] (const std::string &key)
     return this->Block::properties.at(key);
 }
 
-std::shared_ptr<std::map<std::string, double> > Block::getHeapPtr() const
+std::string Block::getLabel() const
 {
-    return varHeap;
+    return blockLabel;
 }
 
 /* *****************************************************************************
@@ -149,11 +149,12 @@ void InitBlock::operator()(const std::vector<std::string> &varList)
         auto delimiter = std::find(init.begin(), init.end(), '=');
         std::string varName(init.begin(), delimiter), varValue(delimiter + 1, init.end());
         bool inserted = varHeap->insert(
-                {varName, parser::parseBinOp(varValue, varHeap) }
+                {varName, parser::evalExpression(varValue, varHeap)}
         ).second;
         // if value already in heap and needs to be redefined
         if (!inserted)
-            (*varHeap)[varName] = parser::parseBinOp(varValue, varHeap);
+            (*varHeap)[varName] =
+                    parser::evalExpression(varValue, varHeap);
     }
 }
 
@@ -178,7 +179,7 @@ std::vector<std::string> SwitchBlock::getBlockProperties()
 
 void SwitchBlock::operator()()
 {
-    bool predSucc = parser::parseBinCmp(properties["Predicate"], varHeap);
+    bool predSucc = parser::foldComparsion(properties["Predicate"], varHeap);
     properties.insert({
             "Next",
             ((predSucc) ? properties["NextSuccess"] : properties["NextFailure"])
