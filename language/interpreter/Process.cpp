@@ -110,6 +110,9 @@ void Process::dbg()
         std::cout << "Heap:\n" << "Variables\t\tValues\n";
         for (const auto &x : *memoryHeap)
             std::cout << x.first << "\t\t\t" << x.second << std::endl;
+
+        std::cout << "\nPress any key to go ahead...\n";
+        getchar();
         nextStep();
     }
 

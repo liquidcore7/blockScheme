@@ -115,7 +115,7 @@ static std::map<char, BinOp*> operations =
 
 static std::map<std::string, BinCmp*> comparisons =
         {
-                {">=", new cmp::lessEq()},
+                {"<=", new cmp::lessEq()},
                 {">=", new cmp::greaterEq()},
                 {"<", new cmp::less()},
                 {">", new cmp::greater()},
