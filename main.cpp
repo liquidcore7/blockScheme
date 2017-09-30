@@ -3,7 +3,7 @@
 
 int main()
 {
-    Process fib("/home/liquidcore7/CLionProjects/blockScheme/language/example/squareFuncArea.blc");
+    Process fib("language/example/squareFuncArea.blc");
     fib();
     misc::_cleanup();
     return 0;
